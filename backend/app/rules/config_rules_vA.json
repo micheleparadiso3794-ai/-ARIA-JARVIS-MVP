@@ -1,4 +1,7 @@
 {
+  "label": "Variante A",
+  "description": "Regole base",
+  "require_human_review": true,
   "categories": {
     "Manutenzione Impianti": {
       "target_role": "Luca (Tecnico)",
@@ -67,7 +70,12 @@
       "immediato",
       "urgente"
     ],
-    "Alta": ["bloccato", "entro oggi", "scaduto", "danno"]
+    "Alta": [
+      "bloccato",
+      "entro oggi",
+      "scaduto",
+      "danno"
+    ]
   },
   "confidence_threshold": 0.6
 }

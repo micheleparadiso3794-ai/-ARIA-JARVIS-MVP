@@ -1,4 +1,7 @@
 {
+  "label": "Variante B",
+  "description": "Regole estese: più keyword e soglia più bassa",
+  "require_human_review": true,
   "categories": {
     "Manutenzione Impianti": {
       "target_role": "Luca (Tecnico)",
@@ -78,7 +81,13 @@
       "urgente",
       "blocco produzione"
     ],
-    "Alta": ["bloccato", "entro oggi", "scaduto", "danno", "fermo"]
+    "Alta": [
+      "bloccato",
+      "entro oggi",
+      "scaduto",
+      "danno",
+      "fermo"
+    ]
   },
   "confidence_threshold": 0.5
 }

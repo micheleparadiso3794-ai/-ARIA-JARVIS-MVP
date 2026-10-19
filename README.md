@@ -1,40 +1,83 @@
-# ⚡ ARIA / JARVIS — MVP Triage & Orchestrazione Processi (Fase 5 ITS 4.0)
+# ARIA / JARVIS — MVP triage richieste operative (Fase 5 ITS 4.0)
 
-[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
-[![Streamlit](https://img.shields.io/badge/Framework-Streamlit-FF4B4B.svg)](https://streamlit.io/)
-[![SQLite](https://img.shields.io/badge/Database-SQLite-003B57.svg)](https://www.sqlite.org/)
-[![ITS 4.0](https://img.shields.io/badge/Project-ITS%204.0-green.svg)]()
+> Le richieste non si perdono. Diventano lavoro.
 
-> **Progetto sviluppato per l'azienda partner NSE (Nuove Soluzioni Energie)**  
-> **Obiettivo**: Razionalizzazione, automazione e triage intelligente delle richieste operative e degli allarmi di cantiere tramite regole deterministiche, Human-in-the-Loop e predisposizione IoT.
+Prototipo per **NSE** che trasforma le richieste in arrivo (guasti, fatture, offerte, problemi IT) in lavoro assegnato:
 
----
+1. **Ingresso**: la richiesta viene scritta o caricata dai casi di prova.
+2. **Triage deterministico**: un motore a regole propone reparto, urgenza e responsabile, evidenziando le parole chiave che ha riconosciuto.
+3. **Revisione umana**: una persona conferma o corregge la proposta, con motivazione. Solo dopo la richiesta passa al responsabile.
+4. **Prove sul motore**: le due varianti di regole (A e B) vengono misurate su 30 casi sintetici e confrontate.
 
-## 📌 Indice
-- [Contesto e Obiettivi](#-contesto-e-obiettivi)
-- [Architettura del Progetto](#-architettura-del-progetto)
-- [Funzionalità Chiave dell'MVP](#-funzionalità-chiave-dellmvp)
-- [Requisiti e Installazione](#-requisiti-e-installazione)
-- [Avvio Rapido (1-Click)](#-avvio-rapido-1-click)
-- [Struttura del Repository](#-struttura-del-repository)
-- [Guida all'Esecuzione dei Test e A/B Testing](#-guida-allesecuzione-dei-test-e-ab-testing)
-- [Pianificazione e Sviluppi Futuri (Roadmap)](#-pianificazione-e-sviluppi-futuri-roadmap)
-- [Team di Progetto](#-team-di-progetto)
+Tutti i dati sono sintetici. Le misure sul dataset sono una verifica preliminare, non un risultato in produzione.
 
----
+## Avvio
 
-## 🌐 Contesto e Obiettivi
+Serve solo Docker.
 
-Nello scenario operativo dell'azienda **NSE**, le comunicazioni in ingresso (richieste d'intervento tecnico, allarmi dagli impianti, fatturazione, richieste commerciali) pervengono in modo frammentato e destrutturato[cite: 1, 18]. 
+```bash
+docker compose up -d --build
+```
 
-**ARIA/JARVIS** nasce per trasformare questo flusso caotico in un quadro operativo ordinato, tracciabile ed efficiente[cite: 1, 18]:
-* **Ingresso ed Estrazione**: Lettura della richiesta e normalizzazione in formato dati unico[cite: 1].
-* **Triage Deterministico**: Identificazione immediata di Categoria, Priorità e Ruolo Responsabile tramite regole ed estrazione di keyword aziendali.
-* **Human-in-the-Loop (HITL)**: Validazione ed approvazione preventiva obbligatoria da parte dell'Amministratore prima dell'assegnazione finale al tecnico o al reparto.
-* **Predisposizione IoT (MQTT)**: Predisposizione all'intercettazione diretta di allarmi di cantiere per la manutenzione predittiva[cite: 3].
+Apri <http://localhost:8080>. Al primo avvio la coda è vuota: scrivi una richiesta o premi «Carica 30 richieste di prova».
 
----
+| Servizio  | Cosa fa                                                   | Indirizzo                           |
+| --------- | --------------------------------------------------------- | ----------------------------------- |
+| `web`     | Caddy: serve il frontend e inoltra `/api` al backend      | <http://localhost:8080>             |
+| `backend` | FastAPI; applica le migrazioni Alembic all'avvio          | <http://localhost:8080/api/docs>    |
+| `db`      | PostgreSQL 17, dati nel volume `pgdata`                   | `127.0.0.1:55432` (solo in locale)  |
 
-## 🏗 Architettura del Progetto
+Porte e credenziali si cambiano copiando `.env.example` in `.env`.
 
-Il sistema segue un'architettura modulare e disaccoppiata:
+```bash
+docker compose down      # ferma, i dati restano
+docker compose down -v   # ferma e cancella il database
+```
+
+## Stack
+
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS 4, componenti in stile shadcn/ui su Base UI, TanStack Router (routing a file) e TanStack Query, Axios, Lucide, Sonner. Font Google Sans.
+- **Backend**: Python 3.12, FastAPI, Uvicorn, Pydantic, pydantic-settings.
+- **Database**: PostgreSQL, SQLAlchemy 2, psycopg 3, Alembic.
+- **Strumenti**: uv, npm, pytest + HTTPX, Ruff, TypeScript, Oxlint, Docker Compose, just.
+
+## Struttura
+
+```
+backend/
+  app/
+    main.py            app FastAPI e router
+    triage.py          motore a regole e metriche
+    dataset.py         30 casi sintetici con risposta attesa
+    rules/             config_rules_vA.json, config_rules_vB.json
+    api/               requests (coda e revisione), lab (prove, regole), misc (meta, stats, feedback)
+    models.py          tabelle SQLAlchemy
+  alembic/             migrazioni
+  tests/               pytest (motore e API)
+frontend/
+  src/routes/          una pagina per file: panoramica, nuova, coda, revisione, prove, regole, feedback
+  src/components/      componenti UI e di dominio
+  src/lib/api.ts       tipi, query e mutation
+  Caddyfile            server statico e proxy /api
+docker-compose.yml
+justfile
+```
+
+## Sviluppo locale
+
+Con [just](https://github.com/casey/just), uv e Node installati:
+
+```bash
+just db     # solo Postgres in Docker
+just api    # backend con reload su :8000
+just web    # frontend con hot reload su :5173
+just test   # pytest
+just lint   # ruff, tsc, oxlint
+```
+
+## Regole del motore
+
+- Ogni parola chiave trovata nel testo vale un punto per il suo reparto. Vince il reparto con più punti.
+- La sicurezza è la quota di punti del reparto vincente; se due reparti sono alla pari è limitata al 49% e la richiesta è segnata come ambigua.
+- Le parole di urgenza alzano la priorità. Se compaiono parole di più livelli vale la più grave.
+- Con `require_human_review: true` (predefinito in entrambe le varianti) ogni richiesta passa dalla revisione umana. Con `false` vanno in revisione solo i casi sotto soglia, ambigui o non classificati.

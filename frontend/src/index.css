@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Token di progetto.
+ * Paper salvia freddo, ink ardesia, primario verde quadro elettrico.
+ * Le priorità usano i colori della segnaletica di cantiere.
+ */
+:root {
+  --paper: #f2f4f1;
+  --surface: #ffffff;
+  --surface-2: #f7f8f6;
+  --ink: #16212b;
+  --muted: #5b6770;
+  --line: #dce1dc;
+  --line-strong: #c4ccc6;
+  --primary: #0b6e5b;
+  --primary-hover: #095c4c;
+  --primary-ink: #ffffff;
+  --primary-soft: #e0efe9;
+  --mark: #fbe9b7;
+  --mark-ink: #5a4100;
+
+  --p-critica: #c8321e;
+  --p-alta: #c77a00;
+  --p-media: #2f5da8;
+  --p-bassa: #6b7a72;
+
+  --ok: #1f7a3f;
+  --danger: #b42318;
+
+  color-scheme: light;
+}
+
+.dark {
+  --paper: #0f1519;
+  --surface: #161f25;
+  --surface-2: #1b252c;
+  --ink: #e6ece8;
+  --muted: #93a09a;
+  --line: #26323a;
+  --line-strong: #34434c;
+  --primary: #3fbf9c;
+  --primary-hover: #5dd0b0;
+  --primary-ink: #06261f;
+  --primary-soft: #133a31;
+  --mark: #4a3a0c;
+  --mark-ink: #fbe3a0;
+
+  --p-critica: #f0705c;
+  --p-alta: #f0b13d;
+  --p-media: #7aa5ec;
+  --p-bassa: #9aa8a0;
+
+  --ok: #5cc98a;
+  --danger: #f97066;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Google Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
+  --color-mark: var(--mark);
+  --color-mark-ink: var(--mark-ink);
+  --color-critica: var(--p-critica);
+  --color-alta: var(--p-alta);
+  --color-media: var(--p-media);
+  --color-bassa: var(--p-bassa);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
+
+  /* Scala tipografica modulare (rapporto ~1.25) */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.6rem;
+  --text-xl: 1.5rem;
+  --text-xl--line-height: 1.9rem;
+  --text-2xl: 2.125rem;
+  --text-2xl--line-height: 2.5rem;
+  --text-3xl: clamp(2rem, 1.2rem + 3vw, 3.25rem);
+  --text-3xl--line-height: 1.05;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-paper text-ink font-sans text-base;
+    font-feature-settings: "tnum" 0;
+    font-optical-sizing: auto;
+  }
+  ::selection {
+    background: var(--primary-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Unico momento orchestrato: il riempimento del flusso in panoramica */
+@keyframes flow-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.animate-flow {
+  transform-origin: left;
+  animation: flow-fill 900ms var(--ease-out-soft) both;
+}
+
+/* Risposta a un'azione: il valore proposto cambia mentre si scrive */
+@keyframes swap-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.animate-swap {
+  animation: swap-in 260ms var(--ease-out-soft);
+}
