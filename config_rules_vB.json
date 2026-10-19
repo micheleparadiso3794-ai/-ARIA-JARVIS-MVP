@@ -1,0 +1,84 @@
+{
+  "categories": {
+    "Manutenzione Impianti": {
+      "target_role": "Luca (Tecnico)",
+      "keywords": [
+        "guasto",
+        "blocco",
+        "inverter",
+        "pressione",
+        "perdita",
+        "pompa",
+        "caldaia",
+        "fumo",
+        "spento",
+        "rottura",
+        "anomalia",
+        "allarme",
+        "manutenzione",
+        "bassa pressione"
+      ],
+      "default_priority": "Alta"
+    },
+    "Amministrazione": {
+      "target_role": "Sara (Back Office)",
+      "keywords": [
+        "fattura",
+        "pagamento",
+        "sollecito",
+        "preventivo",
+        "bonifico",
+        "nota credito",
+        "storno",
+        "incasso",
+        "iban",
+        "scadenza fattura"
+      ],
+      "default_priority": "Media"
+    },
+    "Commerciale": {
+      "target_role": "Giulia (Front Office)",
+      "keywords": [
+        "offerta",
+        "contratto",
+        "nuovo cliente",
+        "allaccio",
+        "informazione",
+        "tariffa",
+        "listino",
+        "subentro",
+        "voltura"
+      ],
+      "default_priority": "Media"
+    },
+    "Supporto IT & Coordinamento": {
+      "target_role": "Andrea (Coordinatore)",
+      "keywords": [
+        "accesso",
+        "software",
+        "credenziali",
+        "server",
+        "pc",
+        "password",
+        "vpn",
+        "mail bloccata",
+        "n8n",
+        "dashboard"
+      ],
+      "default_priority": "Media"
+    }
+  },
+  "priority_boosters": {
+    "Critica": [
+      "esplosione",
+      "pericolo",
+      "fuga gas",
+      "blocco totale",
+      "immediato",
+      "urgente",
+      "blocco produzione"
+    ],
+    "Alta": ["bloccato", "entro oggi", "scaduto", "danno", "fermo"]
+  },
+  "confidence_threshold": 0.5
+}
