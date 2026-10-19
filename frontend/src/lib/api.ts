@@ -6,6 +6,35 @@ export const http = axios.create({ baseURL: "/api" });
 export type Priority = "Bassa" | "Media" | "Alta" | "Critica";
 export type Status = "Da revisionare" | "Assegnato" | "In lavorazione" | "Completato";
 export type Variant = "A" | "B";
+export type PartyKind = "Cliente" | "Fornitore";
+export type ActivityKind = "Nota" | "Intervento" | "Esito" | "Impegno" | "Revisione" | "Stato";
+
+export interface OrganizationSummary {
+  id: number;
+  kind: PartyKind;
+  name: string;
+}
+
+export interface Organization extends OrganizationSummary {
+  tax_id: string | null;
+  customer_code: string | null;
+  email: string | null;
+  phone: string | null;
+  contact_name: string | null;
+  address: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface RequestActivity {
+  id: number;
+  request_id: number;
+  kind: ActivityKind;
+  note: string;
+  actor: string;
+  due_at: string | null;
+  created_at: string;
+}
 
 export interface KeywordMatch {
   keyword: string;
@@ -30,6 +59,8 @@ export interface TriageResult {
 
 export interface Request {
   id: number;
+  organization_id: number | null;
+  organization: OrganizationSummary | null;
   title: string;
   description: string;
   channel: string;
@@ -51,6 +82,7 @@ export interface Request {
   final_role: string | null;
   correction_reason: string | null;
   reviewed_at: string | null;
+  activities: RequestActivity[];
 }
 
 export interface RequestCreate {
@@ -61,6 +93,15 @@ export interface RequestCreate {
   user_urgency?: string;
   notes?: string;
   variant?: Variant;
+  organization_id?: number;
+}
+
+export interface OrganizationInput extends Omit<Organization, "id" | "created_at"> {}
+export interface ActivityInput {
+  kind: ActivityKind;
+  note: string;
+  actor: string;
+  due_at?: string;
 }
 
 export interface ReviewIn {
@@ -167,6 +208,10 @@ export const q = {
     queryOptions({ queryKey: ["requests", params], queryFn: () => get<Request[]>("/requests", params) }),
   request: (id: number) =>
     queryOptions({ queryKey: ["requests", "one", id], queryFn: () => get<Request>(`/requests/${id}`) }),
+  organizations: (search = "", kind?: PartyKind) =>
+    queryOptions({ queryKey: ["organizations", { search, kind }], queryFn: () => get<Organization[]>("/organizations", { search, kind }) }),
+  organizationHistory: (id: number) =>
+    queryOptions({ queryKey: ["organizations", "history", id], queryFn: () => get<Organization & { requests: Request[] }>(`/organizations/${id}/history`) }),
   testRuns: () => queryOptions({ queryKey: ["test-runs"], queryFn: () => get<TestRunSummary[]>("/test-runs") }),
   testRun: (id: number) =>
     queryOptions({ queryKey: ["test-runs", id], queryFn: () => get<TestRun>(`/test-runs/${id}`) }),
@@ -202,11 +247,46 @@ export function useCreateRequest() {
   });
 }
 
+export function useCreateOrganization() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: (body: OrganizationInput) => http.post<Organization>("/organizations", body).then((r) => r.data),
+    onSuccess: () => invalidate("organizations"),
+  });
+}
+
+export function useUpdateOrganization() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: ({ id, ...body }: OrganizationInput & { id: number }) =>
+      http.put<Organization>(`/organizations/${id}`, body).then((r) => r.data),
+    onSuccess: () => invalidate("organizations"),
+  });
+}
+
+export function useAddActivity() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: ({ requestId, ...body }: ActivityInput & { requestId: number }) =>
+      http.post<RequestActivity>(`/requests/${requestId}/activities`, body).then((r) => r.data),
+    onSuccess: (_activity, variables) =>
+      Promise.all([invalidate("requests"), invalidate("organizations")]).then(() => variables),
+  });
+}
+
 export function useSeedRequests() {
   const invalidate = useInvalidate();
   return useMutation({
     mutationFn: () => http.post<{ created: number }>("/requests/seed").then((r) => r.data),
     onSuccess: () => invalidate("requests", "stats"),
+  });
+}
+
+export function useSeedOrganizations() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: () => http.post<{ organizations: number; requests: number }>("/organizations/seed").then((r) => r.data),
+    onSuccess: () => invalidate("organizations", "requests", "stats"),
   });
 }
 

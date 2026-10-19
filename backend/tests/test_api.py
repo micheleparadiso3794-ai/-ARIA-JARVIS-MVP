@@ -28,6 +28,11 @@ def test_request_lifecycle(client):
     assert r.status_code == 200
     assert r.json()["status"] == "In lavorazione"
 
+    activity = client.post(
+        f"/api/requests/{req['id']}/activities",
+        json={"kind": "Esito", "note": "Guarnizione sostituita e impianto verificato.", "actor": "Luca"},
+    )
+    assert activity.status_code == 201
     r = client.patch(f"/api/requests/{req['id']}/status", json={"status": "Completato"})
     assert r.json()["status"] == "Completato"
 
@@ -64,3 +69,69 @@ def test_feedback(client):
     r = client.post("/api/feedback", json={"session_id": "Tester", "worked_well": "Chiaro"})
     assert r.status_code == 201
     assert len(client.get("/api/feedback").json()) == 1
+
+
+def test_organization_history_and_outcome_lifecycle(client):
+    party = client.post(
+        "/api/organizations",
+        json={
+            "kind": "Cliente",
+            "name": "Azienda Demo S.r.l.",
+            "tax_id": "it12345678901",
+            "customer_code": "cli-01",
+            "email": "help@example.test",
+            "contact_name": "Ada Rossi",
+        },
+    )
+    assert party.status_code == 201
+    assert party.json()["tax_id"] == "IT12345678901"
+
+    duplicate = client.post(
+        "/api/organizations",
+        json={"kind": "Fornitore", "name": "Duplicata S.r.l.", "tax_id": "IT12345678901"},
+    )
+    assert duplicate.status_code == 409
+
+    req = client.post(
+        "/api/requests",
+        json={
+            "title": "Pompa con perdita",
+            "description": "Perdita sulla pompa principale.",
+            "organization_id": party.json()["id"],
+        },
+    ).json()
+    assert req["organization"]["name"] == "Azienda Demo S.r.l."
+    assert any(item["kind"] == "Stato" for item in req["activities"])
+
+    client.post(
+        f"/api/requests/{req['id']}/review",
+        json={
+            "final_category": "Manutenzione Impianti",
+            "final_priority": "Alta",
+            "final_role": "Luca",
+            "reason": "Confermata",
+        },
+    )
+    blocked = client.patch(f"/api/requests/{req['id']}/status", json={"status": "Completato"})
+    assert blocked.status_code == 409
+
+    client.post(
+        f"/api/requests/{req['id']}/activities",
+        json={"kind": "Esito", "note": "Raccordo sostituito e prova di tenuta completata."},
+    )
+    completed = client.patch(f"/api/requests/{req['id']}/status", json={"status": "Completato"})
+    assert completed.status_code == 200
+
+    history = client.get(f"/api/organizations/{party.json()['id']}/history").json()
+    assert len(history["requests"]) == 1
+    assert history["requests"][0]["activities"][-1]["kind"] == "Stato"
+
+
+def test_demo_organizations_seed(client):
+    first = client.post("/api/organizations/seed").json()
+    assert first == {"organizations": 6, "requests": 12}
+    second = client.post("/api/organizations/seed").json()
+    assert second == {"organizations": 6, "requests": 0}
+    directory = client.get("/api/organizations", params={"search": "Alfa"}).json()
+    assert len(directory) == 1 and directory[0]["kind"] == "Cliente"
+    assert len(client.get(f"/api/organizations/{directory[0]['id']}/history").json()["requests"]) == 3

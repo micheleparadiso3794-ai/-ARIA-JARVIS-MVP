@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Inbox, Search } from "lucide-react";
+import { Building2, Inbox, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -15,8 +15,17 @@ import {
 } from "@/components/domain";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/drawer";
-import { Input } from "@/components/ui/input";
-import { errorMessage, q, type Request, type Status, useSetStatus } from "@/lib/api";
+import { Field, Input, Textarea } from "@/components/ui/input";
+import {
+  errorMessage,
+  q,
+  type ActivityKind,
+  type Request,
+  type Status,
+  useAddActivity,
+  useSetStatus,
+} from "@/lib/api";
+import { Select } from "@/components/ui/select";
 import { cn, formatDate, timeAgo } from "@/lib/utils";
 
 const STATUSES: Status[] = ["Da revisionare", "Assegnato", "In lavorazione", "Completato"];
@@ -152,14 +161,21 @@ function Queue() {
         title={open?.title}
         description={open && `Richiesta n. ${open.id}, arrivata ${formatDate(open.created_at)} da ${open.channel}`}
       >
-        {open && <RequestDetail request={open} onDone={() => setOpenId(null)} />}
+        {open && <RequestDetail request={open} onDone={() => setOpenId(null)} onOpenRequest={setOpenId} />}
       </Sheet>
     </div>
   );
 }
 
-function RequestDetail({ request: r, onDone }: { request: Request; onDone: () => void }) {
+function RequestDetail({ request: r, onDone, onOpenRequest }: { request: Request; onDone: () => void; onOpenRequest: (id: number) => void }) {
   const setStatus = useSetStatus();
+  const addActivity = useAddActivity();
+  const partyHistory = useQuery({ ...q.organizationHistory(r.organization_id ?? 0), enabled: !!r.organization_id });
+  const [activityKind, setActivityKind] = useState<ActivityKind>("Nota");
+  const [activityNote, setActivityNote] = useState("");
+  const [activityActor, setActivityActor] = useState("Operatore NSE");
+  const [dueAt, setDueAt] = useState("");
+  const hasOutcome = r.activities.some((activity) => activity.kind === "Esito");
   const changed =
     r.final_category !== r.pred_category || r.final_priority !== r.pred_priority || r.final_role !== r.pred_role;
 
@@ -179,6 +195,50 @@ function RequestDetail({ request: r, onDone }: { request: Request; onDone: () =>
       <p className="leading-relaxed">
         <Highlighted text={r.description} matches={r.matches} focusCategory={r.pred_category} />
       </p>
+
+      {r.organization && (
+        <section className="grid gap-3 rounded-lg border border-line bg-surface-2 p-4">
+          <div className="flex items-start gap-3">
+            <Building2 className="mt-1 size-5 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">Storico {r.organization.kind.toLowerCase()}</p>
+              <h3 className="font-semibold">{r.organization.name}</h3>
+              {partyHistory.data ? (
+                <>
+                  <p className="mt-1 text-sm text-muted">
+                    {partyHistory.data.contact_name ?? "Referente non indicato"}
+                    {partyHistory.data.email ? ` · ${partyHistory.data.email}` : ""}
+                    {partyHistory.data.phone ? ` · ${partyHistory.data.phone}` : ""}
+                  </p>
+                  {partyHistory.data.notes && <p className="mt-2 text-sm">{partyHistory.data.notes}</p>}
+                  <p className="mt-2 text-xs text-muted">
+                    {partyHistory.data.requests.length} richieste storiche · {partyHistory.data.requests.filter((item) => item.status !== "Completato").length} ancora aperte
+                  </p>
+                  {partyHistory.data.requests.filter((item) => item.id !== r.id).slice(0, 5).length > 0 && (
+                    <ul className="mt-3 grid gap-2 border-t border-line pt-3">
+                      {partyHistory.data.requests.filter((item) => item.id !== r.id).slice(0, 5).map((item) => (
+                        <li key={item.id}>
+                          <button type="button" onClick={() => onOpenRequest(item.id)} className="w-full rounded-md p-2 text-left hover:bg-surface">
+                            <span className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-medium">{item.title}</span><StatusTag status={item.status} />
+                            </span>
+                            <span className="mt-1 block text-xs text-muted">{item.final_category} · {formatDate(item.created_at)}</span>
+                            {item.activities.at(-1) && <span className="mt-1 block text-sm text-muted">{item.activities.at(-1)?.note}</span>}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : partyHistory.isLoading ? (
+                <p className="mt-1 text-sm text-muted">Caricamento dello storico…</p>
+              ) : (
+                <p className="mt-1 text-sm text-muted">Lo storico non è disponibile.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-3 text-sm">
         <dt className="text-muted">Reparto</dt>
@@ -212,12 +272,44 @@ function RequestDetail({ request: r, onDone }: { request: Request; onDone: () =>
           <TimelineItem title={`Proposta del sistema (regole ${r.rule_variant})`} when={r.created_at}>
             {r.pred_category}, urgenza {r.pred_priority.toLowerCase()}, a {r.pred_role}. {r.reasoning}
           </TimelineItem>
-          {r.reviewed_at && (
+          {r.reviewed_at && !r.activities.some((activity) => activity.kind === "Revisione") && (
             <TimelineItem title={changed ? "Corretta in revisione" : "Confermata in revisione"} when={r.reviewed_at}>
               {r.correction_reason}
             </TimelineItem>
           )}
+          {r.activities.map((activity) => (
+            <TimelineItem key={activity.id} title={`${activity.kind} · ${activity.actor}`} when={activity.created_at}>
+              {activity.note}{activity.due_at ? ` (promemoria: ${formatDate(activity.due_at)})` : ""}
+            </TimelineItem>
+          ))}
         </ol>
+      </section>
+
+      <section className="grid gap-3 border-t border-line pt-5">
+        <h3 className="font-semibold">Aggiungi aggiornamento</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Tipo aggiornamento">
+            <Select value={activityKind} onValueChange={(value) => setActivityKind(value as ActivityKind)}
+              options={["Nota", "Intervento", "Esito", "Impegno"]} />
+          </Field>
+          <Field label="Operatore"><Input value={activityActor} onChange={(e) => setActivityActor(e.target.value)} /></Field>
+        </div>
+        <Field label={activityKind === "Esito" ? "Esito dell’intervento" : "Nota operativa"}>
+          <Textarea value={activityNote} onChange={(e) => setActivityNote(e.target.value)} placeholder="Descrivi cosa è stato fatto o concordato." />
+        </Field>
+        {activityKind === "Impegno" && (
+          <Field label="Data del prossimo contatto" hint="facoltativa">
+            <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+          </Field>
+        )}
+        <div>
+          <Button variant="secondary" disabled={activityNote.trim().length < 3 || addActivity.isPending} onClick={() => addActivity.mutate({
+            requestId: r.id, kind: activityKind, note: activityNote.trim(), actor: activityActor.trim() || "Operatore NSE",
+            due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
+          }, { onSuccess: () => { setActivityNote(""); setDueAt(""); toast.success("Aggiornamento aggiunto allo storico"); }, onError: (e) => toast.error(errorMessage(e)) })}>
+            Salva aggiornamento
+          </Button>
+        </div>
       </section>
 
       <div className="flex flex-wrap gap-2 border-t border-line pt-5">
@@ -232,9 +324,12 @@ function RequestDetail({ request: r, onDone }: { request: Request; onDone: () =>
           </Button>
         )}
         {r.status === "In lavorazione" && (
-          <Button onClick={() => move("Completato", "Segnata come completata")} disabled={setStatus.isPending}>
-            Segna come completata
-          </Button>
+          <div className="grid gap-2">
+            {!hasOutcome && <p className="text-sm text-muted">Per chiudere, aggiungi prima un aggiornamento di tipo “Esito”.</p>}
+            <Button onClick={() => move("Completato", "Segnata come completata")} disabled={setStatus.isPending || !hasOutcome}>
+              Segna come completata
+            </Button>
+          </div>
         )}
         {r.status === "Completato" && (
           <Button variant="secondary" onClick={() => move("In lavorazione", "Riaperta")} disabled={setStatus.isPending}>

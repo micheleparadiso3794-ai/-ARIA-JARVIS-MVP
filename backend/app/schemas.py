@@ -47,10 +47,62 @@ class RequestCreate(BaseModel):
     user_urgency: str | None = None
     notes: str | None = None
     variant: Variant | None = None
+    organization_id: int | None = None
+
+
+class ActivityCreate(BaseModel):
+    kind: Literal["Nota", "Intervento", "Esito", "Impegno"] = "Nota"
+    note: str = Field(min_length=3, max_length=4000)
+    actor: str = Field(default="Operatore NSE", min_length=1, max_length=120)
+    due_at: datetime | None = None
+
+
+class ActivityOut(ORM):
+    id: int
+    request_id: int
+    kind: str
+    note: str
+    actor: str
+    due_at: datetime | None
+    created_at: datetime
+
+
+class OrganizationCreate(BaseModel):
+    kind: Literal["Cliente", "Fornitore"]
+    name: str = Field(min_length=2, max_length=160)
+    tax_id: str | None = Field(default=None, max_length=32)
+    customer_code: str | None = Field(default=None, max_length=50)
+    email: str | None = Field(default=None, max_length=254)
+    phone: str | None = Field(default=None, max_length=40)
+    contact_name: str | None = Field(default=None, max_length=120)
+    address: str | None = Field(default=None, max_length=240)
+    notes: str | None = None
+
+
+class OrganizationOut(ORM):
+    id: int
+    kind: str
+    name: str
+    tax_id: str | None
+    customer_code: str | None
+    email: str | None
+    phone: str | None
+    contact_name: str | None
+    address: str | None
+    notes: str | None
+    created_at: datetime
+
+
+class OrganizationSummary(BaseModel):
+    id: int
+    kind: str
+    name: str
 
 
 class RequestOut(ORM):
     id: int
+    organization_id: int | None
+    organization: OrganizationSummary | None
     title: str
     description: str
     channel: str
@@ -72,6 +124,11 @@ class RequestOut(ORM):
     final_role: str | None
     correction_reason: str | None
     reviewed_at: datetime | None
+    activities: list[ActivityOut]
+
+
+class OrganizationHistory(OrganizationOut):
+    requests: list[RequestOut]
 
 
 class ReviewIn(BaseModel):

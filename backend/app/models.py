@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
@@ -17,6 +19,9 @@ class Request(Base):
     __tablename__ = "requests"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="SET NULL"), index=True
+    )
     title: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
     channel: Mapped[str] = mapped_column(String(40), default="Email")
@@ -40,6 +45,44 @@ class Request(Base):
     final_role: Mapped[str | None] = mapped_column(String(80))
     correction_reason: Mapped[str | None] = mapped_column(Text)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    organization: Mapped[Organization | None] = relationship(back_populates="requests")
+    activities: Mapped[list[RequestActivity]] = relationship(
+        back_populates="request", cascade="all, delete-orphan", order_by="RequestActivity.created_at"
+    )
+
+
+class Organization(Base):
+    """Cliente o fornitore a cui collegare richieste e storico operativo."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(20), index=True)
+    name: Mapped[str] = mapped_column(String(160), index=True)
+    tax_id: Mapped[str | None] = mapped_column(String(32), unique=True, index=True)
+    customer_code: Mapped[str | None] = mapped_column(String(50), unique=True, index=True)
+    email: Mapped[str | None] = mapped_column(String(254))
+    phone: Mapped[str | None] = mapped_column(String(40))
+    contact_name: Mapped[str | None] = mapped_column(String(120))
+    address: Mapped[str | None] = mapped_column(String(240))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    requests: Mapped[list[Request]] = relationship(back_populates="organization")
+
+
+class RequestActivity(Base):
+    """Nota operativa, esito o impegno associato a una richiesta."""
+
+    __tablename__ = "request_activities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("requests.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(30), default="Nota")
+    note: Mapped[str] = mapped_column(Text)
+    actor: Mapped[str] = mapped_column(String(120), default="Operatore NSE")
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    request: Mapped[Request] = relationship(back_populates="activities")
 
 
 class TestRun(Base):

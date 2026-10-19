@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import lab, misc, requests
+from app.api import lab, misc, organizations, requests
 from app.config import get_settings
 
 app = FastAPI(
@@ -19,5 +19,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for router in (misc.router, requests.router, lab.router):
+for router in (misc.router, organizations.router, requests.router, lab.router):
     app.include_router(router, prefix="/api")

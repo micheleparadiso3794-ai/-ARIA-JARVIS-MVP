@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   BookText,
+  Building2,
   FlaskConical,
   Gauge,
   ListChecks,
@@ -33,6 +34,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 const NAV = [
   { to: "/", label: "Panoramica", icon: Gauge },
   { to: "/coda", label: "Coda", icon: ListChecks },
+  { to: "/anagrafiche", label: "Anagrafiche", icon: Building2 },
   { to: "/revisione", label: "Revisione", icon: UserCheck, badge: true },
   { to: "/prove", label: "Prove sul motore", icon: FlaskConical },
   { to: "/regole", label: "Regole", icon: BookText },

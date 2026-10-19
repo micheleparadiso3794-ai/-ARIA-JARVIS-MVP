@@ -8,7 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import { Select } from "@/components/ui/select";
-import { errorMessage, previewTriage, q, useCreateRequest, type Variant } from "@/lib/api";
+import {
+  errorMessage,
+  previewTriage,
+  q,
+  useCreateOrganization,
+  useCreateRequest,
+  useSeedOrganizations,
+  type PartyKind,
+  type Variant,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/nuova")({
@@ -35,6 +44,22 @@ function NewRequest() {
   const navigate = useNavigate();
   const meta = useQuery(q.meta()).data!;
   const create = useCreateRequest();
+  const createOrganization = useCreateOrganization();
+  const seedOrganizations = useSeedOrganizations();
+  const [partyKind, setPartyKind] = useState<PartyKind>("Cliente");
+  const [partySearch, setPartySearch] = useState("");
+  const [organizationId, setOrganizationId] = useState<number | null>(null);
+  const [newParty, setNewParty] = useState(false);
+  const [partyName, setPartyName] = useState("");
+  const [partyTaxId, setPartyTaxId] = useState("");
+  const [partyCode, setPartyCode] = useState("");
+  const [partyEmail, setPartyEmail] = useState("");
+  const [partyPhone, setPartyPhone] = useState("");
+  const [partyAddress, setPartyAddress] = useState("");
+  const [partyContact, setPartyContact] = useState("");
+  const [partyNotes, setPartyNotes] = useState("");
+  const organizations = useQuery(q.organizations(partySearch, partyKind));
+  const selectedParty = organizations.data?.find((org) => org.id === organizationId);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -66,6 +91,17 @@ function NewRequest() {
     setNotes("");
     setUserCategory("");
     setUserUrgency("");
+    setOrganizationId(null);
+    setPartySearch("");
+    setNewParty(false);
+    setPartyName("");
+    setPartyTaxId("");
+    setPartyCode("");
+    setPartyEmail("");
+    setPartyPhone("");
+    setPartyAddress("");
+    setPartyContact("");
+    setPartyNotes("");
     setTouched(false);
   };
 
@@ -73,6 +109,10 @@ function NewRequest() {
     e.preventDefault();
     setTouched(true);
     if (title.trim().length < 3 || description.trim().length < 3) return;
+    if (!organizationId) {
+      toast.error("Seleziona o crea l’anagrafica del cliente o fornitore.");
+      return;
+    }
     create.mutate(
       {
         title: title.trim(),
@@ -82,6 +122,7 @@ function NewRequest() {
         user_urgency: userUrgency || undefined,
         notes: notes || undefined,
         variant,
+        organization_id: organizationId ?? undefined,
       },
       {
         onSuccess: (r) => {
@@ -110,6 +151,86 @@ function NewRequest() {
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <form onSubmit={submit} className="grid gap-5" noValidate>
+          <section className="grid gap-4 rounded-lg border border-line bg-surface p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Cliente o fornitore</h2>
+                <p className="mt-1 text-sm text-muted">Collega l’anagrafica corretta per rendere subito disponibile il suo storico.</p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" onClick={() => seedOrganizations.mutate(undefined, {
+                onSuccess: (result) => {
+                  toast.success("Dati dimostrativi pronti", { description: `${result.organizations} anagrafiche e ${result.requests} richieste storiche aggiunte.` });
+                  setPartySearch("demo");
+                },
+                onError: (err) => toast.error(errorMessage(err)),
+              })} disabled={seedOrganizations.isPending}>
+                Carica esempi
+              </Button>
+            </div>
+            {selectedParty ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-primary-soft p-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted">{selectedParty.kind}</p>
+                  <p className="font-medium">{selectedParty.name}</p>
+                  <p className="text-sm text-muted">{selectedParty.contact_name ?? "Referente non indicato"} · {selectedParty.email ?? selectedParty.customer_code ?? "Nessun recapito"}</p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setOrganizationId(null)}>Rimuovi</Button>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
+                  <Field label="Tipo soggetto">
+                    <Segmented aria-label="Tipo soggetto" value={partyKind} onValueChange={setPartyKind}
+                      options={[{ value: "Cliente", label: "Cliente" }, { value: "Fornitore", label: "Fornitore" }]} />
+                  </Field>
+                  <Field label="Cerca anagrafica" hint="nome, email, codice o partita IVA">
+                    <Input value={partySearch} onChange={(e) => { setPartySearch(e.target.value); setNewParty(false); }} placeholder="Es. Alfa Energia" />
+                  </Field>
+                </div>
+                {partySearch.trim().length >= 2 && (organizations.data?.length ?? 0) > 0 && (
+                  <ul className="grid gap-1" aria-label="Risultati anagrafica">
+                    {organizations.data?.slice(0, 6).map((org) => (
+                      <li key={org.id}>
+                        <button type="button" onClick={() => { setOrganizationId(org.id); setPartySearch(org.name); }} className="w-full rounded-md border border-line px-3 py-2 text-left hover:bg-surface-2">
+                          <span className="font-medium">{org.name}</span><span className="ml-2 text-sm text-muted">{org.kind} · {org.contact_name ?? org.customer_code ?? org.email ?? ""}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!newParty ? (
+                  <Button type="button" variant="secondary" onClick={() => { setNewParty(true); setPartyName(partySearch.trim()); }}>
+                    Crea nuova anagrafica {partyKind.toLowerCase()}
+                  </Button>
+                ) : (
+                  <div className="grid gap-3 rounded-md border border-line p-3">
+                    <p className="text-sm font-medium">Nuova anagrafica {partyKind.toLowerCase()}</p>
+                    <Field label="Nome azienda"><Input value={partyName} onChange={(e) => setPartyName(e.target.value)} placeholder="Ragione sociale" /></Field>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="Partita IVA" hint="facoltativa"><Input value={partyTaxId} onChange={(e) => setPartyTaxId(e.target.value)} /></Field>
+                      <Field label="Codice cliente/fornitore" hint="facoltativo"><Input value={partyCode} onChange={(e) => setPartyCode(e.target.value)} /></Field>
+                      <Field label="Referente"><Input value={partyContact} onChange={(e) => setPartyContact(e.target.value)} /></Field>
+                      <Field label="Email"><Input type="email" value={partyEmail} onChange={(e) => setPartyEmail(e.target.value)} /></Field>
+                      <Field label="Telefono"><Input value={partyPhone} onChange={(e) => setPartyPhone(e.target.value)} /></Field>
+                      <Field label="Sede"><Input value={partyAddress} onChange={(e) => setPartyAddress(e.target.value)} /></Field>
+                      <Field label="Note operative"><Input value={partyNotes} onChange={(e) => setPartyNotes(e.target.value)} /></Field>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" disabled={createOrganization.isPending || partyName.trim().length < 2} onClick={() => createOrganization.mutate({
+                        kind: partyKind, name: partyName, tax_id: partyTaxId || null, customer_code: partyCode || null,
+                        email: partyEmail || null, phone: partyPhone || null, contact_name: partyContact || null,
+                        address: partyAddress || null, notes: partyNotes || null,
+                      }, {
+                        onSuccess: (org) => { setOrganizationId(org.id); setPartySearch(org.name); setNewParty(false); toast.success("Anagrafica creata e collegata"); },
+                        onError: (err) => toast.error(errorMessage(err)),
+                      })}>Crea e collega</Button>
+                      <Button type="button" variant="ghost" onClick={() => setNewParty(false)}>Annulla</Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
           <Field label="Titolo" htmlFor="title" error={titleError}>
             <Input
               id="title"
